@@ -1,5 +1,6 @@
 const http=require('http');
 const fs=require('fs');
+const MiddlewareManager=require("./middleware");
 
 
 class httpProxy {
@@ -8,6 +9,7 @@ class httpProxy {
         this.host= options.host || 'localhost',
         this.target=options.target,
         this.client=httpClient(options.client || {})
+        this.middlewareManager=MiddlewareManager()
     }
 
     async start() {
@@ -50,6 +52,9 @@ class httpProxy {
         } catch (error) {
             
         }
+    }
+    use(middleware){
+        this.middlewareManager.use(middleware);
     }
 }
 
