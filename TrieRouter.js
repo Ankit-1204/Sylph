@@ -17,11 +17,12 @@ const http_methods={
     OPTIONS:'OPTIONS',
     PATCH:'PATCH'
 }
+// Note: Have to also add query handling--> ? and & 
 class TrieRouter{
     constructor(){
         this.root=new BaseRouter()
     }   
-    addRouter(path,method,handler){
+    addRoute(path,method,handler){
         if (typeof path !== "string" || path[0] !== "/") throw new Error("Malformed path provided.");
         if (typeof handler !== "function") throw new Error("Handler should be a function");
         
@@ -56,7 +57,7 @@ class TrieRouter{
         currentNode.params=dynamicParams;
         currentNode.handler.set(method,handler)
     }
-    findRouter(path,method){
+    findRoute(path,method){
         let routePath=path.split('/').filter(Boolean)
         let currentNode=this.root;
         let paramsArray=[];

@@ -22,6 +22,7 @@ class MiddlewareManager{
         for (const ware of array) {
             try {
                 const response=await ware(data);
+                return response
             } catch (error) {
                 throw new Error("Middleware execution failed");
                 
