@@ -1,7 +1,7 @@
 const http=require('http');
 const fs=require('fs');
 const MiddlewareManager=require("./middleware");
-
+const Cache=require('./Cache')
 
 class httpProxy {
     constructor(options={}){
@@ -15,7 +15,7 @@ class httpProxy {
     async start() {
         return Promise((resolve,reject)=>{
             this.server=http.createServer(async (req,res)=>{
-                await handle();
+                await handleReq(req,res);
             })
             this.server.listen(this.port,this.host,()=>{
                 console.log(`server on ${this.port}`);
@@ -35,6 +35,9 @@ class httpProxy {
     route(url){
         return;
     }
+    addCache(options={}){
+        this.httpClient.cache=Cache(options);
+    }
     async handleReq(req,res){
         const starttime=Date.now();
 
@@ -46,7 +49,6 @@ class httpProxy {
                 port: target.port,
                 path: req.url,
                 method: req.method,
-                
             };
             
         } catch (error) {
@@ -61,6 +63,7 @@ class httpProxy {
 class httpClient {
     constructor(options={}){
         this.timeout=options.timeout || 3000
+        this.cache=null;
     }
 
     async makeReq(data){
@@ -73,6 +76,13 @@ class httpClient {
                 method: req.method,
                 headers:data.request.headers,
                 timeout:this.timeout
+            }
+            if(this.cache){
+                const key=this.cache.keyGenerator(req);
+                const part=this.cache.get(key);
+                if(part){
+                    
+                }
             }
             const proxyReq=http.request(options,(res)=>{
                 let response=[];
