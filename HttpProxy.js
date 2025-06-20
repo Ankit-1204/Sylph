@@ -46,6 +46,7 @@ class httpProxy {
             const url=req.url
             const target=route(url)
             const options = {
+                starttime:starttime,
                 hostname: target.host,
                 port: target.port,
                 path: req.url,
@@ -69,7 +70,7 @@ class httpClient {
 
     async makeReq(data){
         return Promise((resolve,reject),()=>{
-            const target=url.parse(data.url)
+            const target=url.parse(data.req.url)
             const options={
                 hostname: target.host,
                 port: target.port,
@@ -79,31 +80,49 @@ class httpClient {
                 timeout:this.timeout
             }
             if(this.cache){
-                const key=this.cache.keyGenerator(req);
-                const part=this.cache.get(key);
+                const key=this.cache.keyGenerator(req);   // Note to self, generalise this to integrate with other caching methods (ex. Redis)
+                const part=this.cache.memory.get(key);
                 if(part){
                     data.res.statusCode=part.statusCode;
                     data.res.headers={...part.headers};
+                    data.res.headers=part.body
                 }
             }
-            const proxyReq=http.request(options,(res)=>{
+            const ProxyReq=http.request(options,(ProxyRes)=>{
                 let response=[];
-                proxyReq.on('data',(chunk)=>{
+                ProxyRes.on('data',(chunk)=>{
                     response.push(chunk)
                 })
-                proxyReq.on('timeout',()=>{
-                    proxyReq.destroy();
+                ProxyRes.on('timeout',()=>{
+                    ProxyRes.destroy();
                 })
-                proxyReq.on('end',()=>{
-                    data.res.statusCode=proxyReq.statusCode;
-                    data.res.headers={...proxyReq.headers}
+                ProxyRes.on('end',()=>{
+                    data.res.statusCode=ProxyRes.statusCode;
+                    data.res.headers={...ProxyRes.headers}
                     data.res.body=Buffer.concat(response);
+                    resolve(data)
                 })
             })
+            ProxyReq.on('timeout',()=>{
+                    ProxyReq.destroy();
+                    console.log("proxyReq destroy")
+                    reject();
+            })
+            ProxyReq.on('error', (error) => {
+                reject(error);
+            });
             if(data.req.body){
-                proxyReq.write(data.req.body);
+                ProxyReq.write(data.req.body);
             }
-            proxyReq.end();
+            if(this.cache){
+                const key=this.cache.keyGenerator(req);
+                this.cache.memory.set(key,{
+                    statusCode:data.res.statusCode,
+                    headers:data.res.headers,
+                    body:data.res.body
+                })
+            }
+            ProxyReq.end();
         })
         
     }

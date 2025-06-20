@@ -4,7 +4,7 @@ class Cache{
     constructor(options={}){
         this.memory=new InmemoryStorage();
         this.til=options.til;
-        this.cache=new lru({
+        this.memory=new lru({
             max:options.max || 1000,
             ttl:options.ttl || 1000 * 60,
         })
