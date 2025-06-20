@@ -47,7 +47,7 @@ class TrieRouter{
                 }
                 dynamicParams.push(val)
             }
-            let childroot=currentNode.root.children.get(part);
+            let childroot=currentNode.children.get(part);
             if(!childroot){
                 childroot=new BaseRouter()
                 currentNode.children.set(part,childroot)
@@ -78,6 +78,8 @@ class TrieRouter{
         for (let index = 0; index < paramsArray.length; index++) {
             params[currentNode.params[index]]=paramsArray[index]
         }
-        return currentNode.handler.get(params,method);
+        return {params,handler:currentNode.handler.get(method)};
     }
 }
+
+export default TrieRouter;

@@ -1,4 +1,5 @@
 const http=require('http');
+const TrieRouter=require('./TrieRouter')
 const fs=require('fs');
 const MiddlewareManager=require("./middleware");
 const Cache=require('./Cache');
@@ -11,6 +12,7 @@ class httpProxy {
         this.target=options.target,
         this.client=httpClient(options.client || {})
         this.middlewareManager=MiddlewareManager()
+        this.router=options.router || null
     }
 
     async start() {
@@ -33,8 +35,18 @@ class httpProxy {
             })
         })
     }
-    route(url){
-        return;
+    useRouter(router){
+        this.router=router;
+    }
+    addRoute(path,method,handler){
+        if(this.router){
+            this.router.addRoute(path,method,handler);
+        }else{
+            throw new Error("router doesnt exist");
+        }
+    }
+    findRoute(path,method){
+        return this.router.findRoute(path,method)
     }
     addCache(options={}){
         this.httpClient.cache=Cache(options);
@@ -44,15 +56,17 @@ class httpProxy {
 
         try {
             const url=req.url
-            const target=route(url)
+            const route=this.findRoute(req.path,req.method)
+            const target=route.handler();
             const options = {
                 starttime:starttime,
                 hostname: target.host,
                 port: target.port,
                 path: req.url,
                 method: req.method,
+                urlParams:route.params,
             };
-            this.client.makeReq({req,res,options})
+            await this.client.makeReq({req,res,options})
         } catch (error) {
             
         }
