@@ -1,7 +1,8 @@
 const http=require('http');
 const fs=require('fs');
 const MiddlewareManager=require("./middleware");
-const Cache=require('./Cache')
+const Cache=require('./Cache');
+const { buffer } = require('stream/consumers');
 
 class httpProxy {
     constructor(options={}){
@@ -50,7 +51,7 @@ class httpProxy {
                 path: req.url,
                 method: req.method,
             };
-            
+            this.client.makeReq({req,res,options})
         } catch (error) {
             
         }
@@ -81,7 +82,8 @@ class httpClient {
                 const key=this.cache.keyGenerator(req);
                 const part=this.cache.get(key);
                 if(part){
-                    
+                    data.res.statusCode=part.statusCode;
+                    data.res.headers={...part.headers};
                 }
             }
             const proxyReq=http.request(options,(res)=>{
@@ -92,9 +94,14 @@ class httpClient {
                 proxyReq.on('timeout',()=>{
                     proxyReq.destroy();
                 })
+                proxyReq.on('end',()=>{
+                    data.res.statusCode=proxyReq.statusCode;
+                    data.res.headers={...proxyReq.headers}
+                    data.res.body=Buffer.concat(response);
+                })
             })
-            if(data.request.body){
-                proxyReq.write(data.request.body);
+            if(data.req.body){
+                proxyReq.write(data.req.body);
             }
             proxyReq.end();
         })
