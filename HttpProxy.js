@@ -1,8 +1,8 @@
 const http=require('http');
-const TrieRouter=require('./TrieRouter')
+const {TrieRouter}=require('./TrieRouter')
 const fs=require('fs');
-const MiddlewareManager=require("./middleware");
-const Cache=require('./Cache');
+const {MiddlewareManager}=require("./middleware");
+const {Cache}=require('./Cache');
 const { buffer } = require('stream/consumers');
 
 class httpProxy {
@@ -10,15 +10,15 @@ class httpProxy {
         this.port= options.port || 8080,
         this.host= options.host || 'localhost',
         this.target=options.target,
-        this.client=httpClient(options.client || {})
-        this.middlewareManager=MiddlewareManager()
+        this.client=new httpClient(options.client || {})
+        this.middlewareManager=new MiddlewareManager()
         this.router=options.router || null
     }
 
     async start() {
-        return Promise((resolve,reject)=>{
+        return new Promise((resolve,reject)=>{
             this.server=http.createServer(async (req,res)=>{
-                await handleReq(req,res);
+                await this.handleReq(req,res);
             })
             this.server.listen(this.port,this.host,()=>{
                 console.log(`server on ${this.port}`);
@@ -28,7 +28,7 @@ class httpProxy {
     }
 
     async stop(){
-        return Promise((resolve,reject)=>{
+        return new Promise((resolve,reject)=>{
             this.server.close(()=>{
                 console.log("Server closed");
                 resolve();
@@ -83,7 +83,7 @@ class httpClient {
     }
 
     async makeReq(data){
-        return Promise((resolve,reject),()=>{
+        return new Promise((resolve,reject),()=>{
             const target=url.parse(data.req.url)
             const options={
                 hostname: target.host,
@@ -141,3 +141,7 @@ class httpClient {
         
     }
 }
+function proxy(options={}){
+    return new httpProxy(options);
+}
+module.exports={proxy}

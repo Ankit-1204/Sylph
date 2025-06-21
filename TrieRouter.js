@@ -78,8 +78,8 @@ class TrieRouter{
         for (let index = 0; index < paramsArray.length; index++) {
             params[currentNode.params[index]]=paramsArray[index]
         }
-        return {params,handler:currentNode.handler.get(method)};
+        return {params:params,handler:currentNode.handler.get(method)};
     }
 }
 
-export default TrieRouter;
+module.exports={TrieRouter};

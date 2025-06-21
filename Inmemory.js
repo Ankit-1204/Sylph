@@ -6,4 +6,4 @@ class InmemoryStorage{
 }
 
 
-export default InmemoryStorage;
+module.exports={InmemoryStorage};

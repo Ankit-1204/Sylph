@@ -31,4 +31,4 @@ class MiddlewareManager{
     }
     
 }
-export default MiddlewareManager
+module.exports={MiddlewareManager}
