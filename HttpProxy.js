@@ -4,6 +4,7 @@ const fs=require('fs');
 const {MiddlewareManager}=require("./middleware");
 const {Cache}=require('./Cache');
 const { buffer } = require('stream/consumers');
+const {url}=require('url')
 
 class httpProxy {
     constructor(options={}){
@@ -12,7 +13,7 @@ class httpProxy {
         this.target=options.target,
         this.client=new httpClient(options.client || {})
         this.middlewareManager=new MiddlewareManager()
-        this.router=options.router || null
+        this.router=options.router || new TrieRouter()
     }
 
     async start() {
@@ -46,6 +47,7 @@ class httpProxy {
         }
     }
     findRoute(path,method){
+        console.log('proxy find route')
         return this.router.findRoute(path,method)
     }
     addCache(options={}){
@@ -55,20 +57,24 @@ class httpProxy {
         const starttime=Date.now();
 
         try {
-            const url=req.url
-            const route=this.findRoute(req.path,req.method)
+            
+            const urll=req.url
+            const route=this.findRoute(urll,req.method)
             const target=route.handler();
+            console.log(target)
             const options = {
                 starttime:starttime,
+                target:target,
                 hostname: target.host,
                 port: target.port,
                 path: req.url,
                 method: req.method,
                 urlParams:route.params,
             };
-            await this.client.makeReq({req,res,options})
+            await this.client.makeReq({req:req,res:res,options:options})
+
         } catch (error) {
-            
+            console.log(error)
         }
     }
     use(middleware){
@@ -83,14 +89,15 @@ class httpClient {
     }
 
     async makeReq(data){
-        return new Promise((resolve,reject),()=>{
-            const target=url.parse(data.req.url)
+        return new Promise((resolve,reject)=>{
+            console.log(data.options.target)
+            const target=data.options.target
             const options={
                 hostname: target.host,
                 port: target.port,
-                path: req.url,
-                method: req.method,
-                headers:data.request.headers,
+                path: data.req.url,
+                method: data.req.method,
+                headers:data.res.headers,
                 timeout:this.timeout
             }
             if(this.cache){

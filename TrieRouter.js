@@ -31,6 +31,7 @@ class TrieRouter{
             
         }
         let routePath=path.split('/').filter(Boolean)
+        console.log(routePath)
         let currentNode=this.root;
         let dynamicParams=[];
         for (let index = 0; index < routePath.length; index++) {
@@ -59,6 +60,7 @@ class TrieRouter{
     }
     findRoute(path,method){
         let routePath=path.split('/').filter(Boolean)
+        console.log(routePath)
         let currentNode=this.root;
         let paramsArray=[];
         for (let index = 0; index < routePath.length; index++) {
@@ -71,6 +73,7 @@ class TrieRouter{
                 paramsArray.push(part);
             }
             else{
+                console.log('got null')
                 return null;
             }
         }
