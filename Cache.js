@@ -1,10 +1,9 @@
 const InmemoryStorage=require('./Inmemory')
-const lru=require('lru-cache')
+const LRUCache=require('lru-cache').LRUCache
 class Cache{
     constructor(options={}){
-        this.memory=new InmemoryStorage();
         this.til=options.til;
-        this.memory=new lru({
+        this.memory=new LRUCache({
             max:options.max || 1000,
             ttl:options.ttl || 1000 * 60,
         })
@@ -17,10 +16,10 @@ class Cache{
         return (this.CACHEABLE_METHODS.includes(req.method) && this.CACHEABLE_STATUS.includes(res.status))
     }
 
-    keyGenerator(req){
-        const method=req.method;
-        let url=this.parseUrl(req.url);
-        let headerPath=this.getHeaders(req.headers,this.varyHeaders);
+    keyGenerator(options){
+        const method=options.method;
+        let url=this.parseUrl(options.target);
+        let headerPath=this.getHeaders(options.headers,this.varyHeaders);
         const finalPath=`${method}:${url}:${headerPath}`
 
         return finalPath;
@@ -29,8 +28,7 @@ class Cache{
         const headerPath=varyHeaders.map(h=>`${h}:${headers[h.toLowerCase()] || ""}`).join();
         return headerPath;
     }
-    parseUrl(url){
-        const u=new URL(url);
+    parseUrl(u){
         const params=[...u.searchParams.entries()]   // this gives something like -> [['a',1], ['b',2]]
         const sortedParams=params.sort((a,b)=>a[0].localeCompare(b[0])) // basically a comparater
         const paramsString=new URLSearchParams(sortedParams).toString()

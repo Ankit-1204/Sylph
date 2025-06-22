@@ -50,7 +50,7 @@ class httpProxy {
         return this.router.findRoute(path,method)
     }
     addCache(options={}){
-        this.httpClient.cache=Cache(options);
+        this.client.cache=new Cache(options);
     }
     async handleReq(req,res){
         const starttime=Date.now();
@@ -59,7 +59,7 @@ class httpProxy {
             
             const urll=req.url
             const route=this.findRoute(urll,req.method)
-            const target=route.handler();
+            const target=route.handler(route.params);
             const options = {
                 starttime:starttime,
                 target:new URL(target),
@@ -70,8 +70,8 @@ class httpProxy {
                 urlParams:route.params,
             };
             await this.client.makeReq({req:req,res:res,options:options})
-
-            res.end();
+            res.writeHead(res.statusCode,res.headers)
+            res.end(res.body);
 
         } catch (error) {
             console.log(error)
@@ -84,7 +84,7 @@ class httpProxy {
 
 class httpClient {
     constructor(options={}){
-        this.timeout=options.timeout || 3000
+        this.timeout=options.timeout || 3000;
         this.cache=null;
     }
 
@@ -92,6 +92,7 @@ class httpClient {
         return new Promise((resolve,reject)=>{
             const target=data.options.target
             const options={
+                target:target,
                 hostname: target.host,
                 port: target.port,
                 path: target.pathname,
@@ -99,22 +100,23 @@ class httpClient {
                 headers:data.req.headers,
                 timeout:this.timeout
             }
-            console.log(options)
+            let part=null;
             if(this.cache){
-                const key=this.cache.keyGenerator(req);   // Note to self, generalise this to integrate with other caching methods (ex. Redis)
-                const part=this.cache.memory.get(key);
-                if(part){
-                    data.res.statusCode=part.statusCode;
-                    data.res.headers={...part.headers};
-                    data.res.headers=part.body
-                }
+                const key=this.cache.keyGenerator(options);   // Note to self, generalise this to integrate with other caching methods (ex. Redis)
+                part=this.cache.memory.get(key);}
+            if(part){
+                console.log('cache_hit');
+                data.res.statusCode=part.statusCode;
+                data.res.headers={...part.headers};
+                data.res.body=part.body
+                resolve(data)
             }
-            
+            else{
+            console.log('cache_miss');
             const ProxyReq=http.request(options,(ProxyRes)=>{
                 let response=[];
                 ProxyRes.on('data',(chunk)=>{
                     response.push(chunk)
-                    console.log(response)
                 })
                 ProxyRes.on('timeout',()=>{
                     ProxyRes.destroy();
@@ -123,6 +125,14 @@ class httpClient {
                     data.res.statusCode=ProxyRes.statusCode;
                     data.res.headers={...ProxyRes.headers}
                     data.res.body=Buffer.concat(response);
+                    if(this.cache){
+                        const key=this.cache.keyGenerator(options);
+                        this.cache.memory.set(key,{
+                            statusCode:data.res.statusCode,
+                            headers:data.res.headers,
+                            body:data.res.body
+                        })
+                    }
                     resolve(data)
                 })
             })
@@ -138,15 +148,7 @@ class httpClient {
             if(data.req.body){
                 ProxyReq.write(data.req.body);
             }
-            if(this.cache){
-                const key=this.cache.keyGenerator(req);
-                this.cache.memory.set(key,{
-                    statusCode:data.res.statusCode,
-                    headers:data.res.headers,
-                    body:data.res.body
-                })
-            }
-            ProxyReq.end();
+            ProxyReq.end();}
         })
         
     }
