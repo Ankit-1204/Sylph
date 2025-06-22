@@ -4,7 +4,8 @@ const PORT = 3000;
 
 app.use(express.json());
 
-app.all('/{*any}', (req, res) => {
+app.all('/', (req, res) => {
+    console.log('responding')
   res.json({
     message: 'Hello from origin!',
     method: req.method,

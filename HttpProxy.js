@@ -4,7 +4,6 @@ const fs=require('fs');
 const {MiddlewareManager}=require("./middleware");
 const {Cache}=require('./Cache');
 const { buffer } = require('stream/consumers');
-const {url}=require('url')
 
 class httpProxy {
     constructor(options={}){
@@ -61,10 +60,9 @@ class httpProxy {
             const urll=req.url
             const route=this.findRoute(urll,req.method)
             const target=route.handler();
-            console.log(target)
             const options = {
                 starttime:starttime,
-                target:target,
+                target:new URL(target),
                 hostname: target.host,
                 port: target.port,
                 path: req.url,
@@ -72,6 +70,8 @@ class httpProxy {
                 urlParams:route.params,
             };
             await this.client.makeReq({req:req,res:res,options:options})
+
+            res.end();
 
         } catch (error) {
             console.log(error)
@@ -90,16 +90,16 @@ class httpClient {
 
     async makeReq(data){
         return new Promise((resolve,reject)=>{
-            console.log(data.options.target)
             const target=data.options.target
             const options={
                 hostname: target.host,
                 port: target.port,
-                path: data.req.url,
+                path: target.pathname,
                 method: data.req.method,
-                headers:data.res.headers,
+                headers:data.req.headers,
                 timeout:this.timeout
             }
+            console.log(options)
             if(this.cache){
                 const key=this.cache.keyGenerator(req);   // Note to self, generalise this to integrate with other caching methods (ex. Redis)
                 const part=this.cache.memory.get(key);
@@ -109,10 +109,12 @@ class httpClient {
                     data.res.headers=part.body
                 }
             }
+            
             const ProxyReq=http.request(options,(ProxyRes)=>{
                 let response=[];
                 ProxyRes.on('data',(chunk)=>{
                     response.push(chunk)
+                    console.log(response)
                 })
                 ProxyRes.on('timeout',()=>{
                     ProxyRes.destroy();
@@ -130,6 +132,7 @@ class httpClient {
                     reject();
             })
             ProxyReq.on('error', (error) => {
+                console.log(error)
                 reject(error);
             });
             if(data.req.body){
