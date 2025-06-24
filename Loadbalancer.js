@@ -35,4 +35,12 @@ class Loadbalancer{
         chosen.totalRequest++;
         return chosen
     }
+    releaseTarget(service,target){
+        const entry= this.services[service].find(t=>t.url.href===target.url.href);
+        if (entry) entry.activeConn = Math.max(0, entry.activeConn - 1);
+        return;
+    }
 }
+
+module.exports={Loadbalancer};
+// Look into improvements related to concurancy and backpressure .

@@ -4,6 +4,7 @@ const fs=require('fs');
 const {MiddlewareManager}=require("./middleware");
 const {Cache}=require('./Cache');
 const { buffer } = require('stream/consumers');
+const Loadbalancer=require('./Loadbalancer');
 
 class httpProxy {
     constructor(options={}){
@@ -13,6 +14,7 @@ class httpProxy {
         this.client=new httpClient(options.client || {})
         this.middlewareManager=new MiddlewareManager()
         this.router=options.router || new TrieRouter()
+        this.loadBalancer=Loadbalancer()
     }
 
     async start() {
@@ -52,6 +54,12 @@ class httpProxy {
     addCache(options={}){
         this.client.cache=new Cache(options);
     }
+    setLBAlgorithm(algo){
+        this.loadBalancer.algorithm=algo;
+    }
+    addService(service,target=[]){
+        this.loadBalancer.addService(service,target);
+    }
     async handleReq(req,res){
         const starttime=Date.now();
 
@@ -59,7 +67,16 @@ class httpProxy {
             
             const urll=req.url
             const route=this.findRoute(urll,req.method)
-            const target=route.handler(route.params);
+            const routeObject=route.handler(route.params);
+            let target;
+            if(routeObject.type==='direct'){
+                target=routeObject.url;
+            }else if (routeObject.type==='service') {
+                const targetObject=this.loadBalancer.getTarget(routeObject.name);
+                target=targetObject.url;
+            }else{
+                throw new Error('Unknown routing type');
+            }
             const options = {
                 starttime:starttime,
                 target:new URL(target),
@@ -68,10 +85,10 @@ class httpProxy {
                 path: req.url,
                 method: req.method,
                 urlParams:route.params,
-            };
-            await this.client.makeReq({req:req,res:res,options:options})
-            res.writeHead(res.statusCode,res.headers)
-            res.end(res.body);
+                };
+                await this.client.makeReq({req:req,res:res,options:options})
+                res.writeHead(res.statusCode,res.headers)
+                res.end(res.body);
 
         } catch (error) {
             console.log(error)
