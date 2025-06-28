@@ -3,7 +3,7 @@ const {TrieRouter}=require('./TrieRouter')
 const fs=require('fs');
 const {MiddlewareManager}=require("./middleware");
 const {Cache}=require('./Cache');
-const { buffer } = require('stream/consumers');
+const { pipeline, PassThrough } = require('stream');
 const {Loadbalancer}=require('./Loadbalancer');
 
 class httpProxy {
@@ -135,27 +135,41 @@ class httpClient {
             else{
             console.log('cache_miss');
             const ProxyReq=http.request(options,(ProxyRes)=>{
-                let response=[];
-                ProxyRes.on('data',(chunk)=>{
-                    response.push(chunk)
-                })
-                ProxyRes.on('timeout',()=>{
-                    ProxyRes.destroy();
-                })
-                ProxyRes.on('end',()=>{
-                    data.res.statusCode=ProxyRes.statusCode;
-                    data.res.headers={...ProxyRes.headers}
-                    data.res.body=Buffer.concat(response);
-                    if(this.cache){
-                        const key=this.cache.keyGenerator(options);
+                const isCacheable=this.cache;
+                const key=this.cache?.keyGenerator(options)
+                const cacheStream= isCacheable?new PassThrough() :null;
+                
+                if(isCacheable){
+                    let cacheBody=[]
+                    cacheStream.on('data',(chunk)=>{
+                        cacheBody.push(chunk);
+                    })
+                    cacheStream.on('end',()=>{
                         this.cache.memory.set(key,{
-                            statusCode:data.res.statusCode,
-                            headers:data.res.headers,
-                            body:data.res.body
+                            statusCode: ProxyRes.statusCode,
+                            headers: ProxyRes.headers,
+                            body: Buffer.concat(cacheBody),
                         })
-                    }
-                    resolve(data)
+                        console.log('cached stored')
+                    })
+                }
+                data.res.writeHead(ProxyRes.statusCode,ProxyRes.headers);
+                const tee=new PassThrough();
+
+                pipeline(ProxyRes,tee,(err)=>{
+                    if (err) console.error('Stream error from backend:', err);
                 })
+
+                pipeline(tee,data.res,(err) => {
+                    if (err) console.error('Client write failed:', err);
+                    resolve();
+                })
+                if (isCacheable) {
+                    pipeline(tee, cacheStream, (err) => {
+                    if (err) console.error('Cache stream error:', err);
+                    });
+                }
+                
             })
             ProxyReq.on('timeout',()=>{
                     ProxyReq.destroy();
@@ -166,9 +180,12 @@ class httpClient {
                 console.log(error)
                 reject(error);
             });
-            if(data.req.body){
-                ProxyReq.write(data.req.body);
+            pipeline(data.req,ProxyReq,(err) => {
+            if (err) {
+                ProxyReq.destroy();
+                console.error('Request stream error:', err);
             }
+            })
             ProxyReq.end();}
         })
         
