@@ -4,7 +4,7 @@ const fs=require('fs');
 const {MiddlewareManager}=require("./middleware");
 const {Cache}=require('./Cache');
 const { buffer } = require('stream/consumers');
-const Loadbalancer=require('./Loadbalancer');
+const {Loadbalancer}=require('./Loadbalancer');
 
 class httpProxy {
     constructor(options={}){
@@ -14,7 +14,7 @@ class httpProxy {
         this.client=new httpClient(options.client || {})
         this.middlewareManager=new MiddlewareManager()
         this.router=options.router || new TrieRouter()
-        this.loadBalancer=Loadbalancer()
+        this.loadBalancer=new Loadbalancer()
     }
 
     async start() {
@@ -69,10 +69,11 @@ class httpProxy {
             const route=this.findRoute(urll,req.method)
             const routeObject=route.handler(route.params);
             let target;
+            let targetObject
             if(routeObject.type==='direct'){
                 target=routeObject.url;
             }else if (routeObject.type==='service') {
-                const targetObject=this.loadBalancer.getTarget(routeObject.name);
+                targetObject=this.loadBalancer.getTarget(routeObject.name);
                 target=targetObject.url;
             }else{
                 throw new Error('Unknown routing type');
@@ -87,6 +88,9 @@ class httpProxy {
                 urlParams:route.params,
                 };
                 await this.client.makeReq({req:req,res:res,options:options})
+                if(targetObject){
+                    this.loadBalancer.releaseTarget(routeObject.name,targetObject)
+                }
                 res.writeHead(res.statusCode,res.headers)
                 res.end(res.body);
 

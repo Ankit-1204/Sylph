@@ -4,10 +4,11 @@ const app=proxy();
 
 
 // app.useRouter()
-function f(params){
+function f(){
     console.log('runs')
-    return `http://localhost:3000/${params.id}`;
+    return {name:`testing`,type:'service'};
 }
+app.addService('testing',[{url:"http://localhost:3000"},{url:"http://localhost:3001"}])
 app.addRoute('/api/:id','GET',f)
 app.addCache()
 app.start()

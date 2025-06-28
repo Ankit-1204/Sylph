@@ -1,7 +1,7 @@
 class Loadbalancer{
     constructor(){
         this.services={},
-        this.algorithm='round-robin'   
+        this.algorithm='roundRobin'   
         this.counter={} 
     }
     addService(service,target=[]){
@@ -21,7 +21,8 @@ class Loadbalancer{
                 if(!this.counter[service]){
                     this.counter[service]=0;
                 }
-                const idx=(this.counter[service]+1)%targetList.length;
+                const idx=(this.counter[service])%targetList.length;
+                this.counter[service]+=1;
                 chosen=targetList[idx];
                 break;
             case 'leastConnections':
@@ -29,7 +30,6 @@ class Loadbalancer{
                 break
             default:
                 throw new Error("Invalid algorithm provided");
-                break;
         }
         chosen.activeConn++;
         chosen.totalRequest++;
