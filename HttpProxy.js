@@ -15,9 +15,18 @@ class httpProxy {
         this.middlewareManager=new MiddlewareManager()
         this.router=options.router || new TrieRouter()
         this.loadBalancer=new Loadbalancer()
+        this.enableMonitor=options.enableMonitor || false
+        this.monitorOptions={
+            uiPath:options.monitorOptions?.uiPath || '/dashboard',
+            wsPath:options.monitorOptions?.wsPath || '/ws'
+        }
     }
 
     async start() {
+        if(this.enableMonitor){
+            const ws=new (require('ws').Server)({noServer:true})
+            this.client.on('upgrade',())
+        }
         return new Promise((resolve,reject)=>{
             this.server=http.createServer(async (req,res)=>{
                 await this.handleReq(req,res);
@@ -27,7 +36,7 @@ class httpProxy {
                 resolve()
             })
         })
-    }
+    } 
 
     async stop(){
         return new Promise((resolve,reject)=>{
