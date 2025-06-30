@@ -107,11 +107,24 @@ class httpClient {
     constructor(options={}){
         this.timeout=options.timeout || 3000;
         this.cache=null;
+        this.agentPool= new Map();
     }
-
+    getAgent(target){
+        const key=`${target.hostname}:${target.port}`;
+        if (!this.agentPool.has(key)) {
+            const agent = new http.Agent({
+                keepAlive: true,
+                maxSockets: 100,       
+                keepAliveMsecs: 30000,  
+            });
+            this.agentPool.set(key, agent);
+        }
+        return this.agentPool.get(key);
+    }
     async makeReq(data){
         return new Promise((resolve,reject)=>{
             const target=data.options.target
+            const agent=this.getAgent(target);
             const options={
                 target:target,
                 hostname: target.host,
@@ -119,7 +132,8 @@ class httpClient {
                 path: target.pathname,
                 method: data.req.method,
                 headers:data.req.headers,
-                timeout:this.timeout
+                timeout:this.timeout,
+                agent:agent,
             }
             let part=null;
             if(this.cache){
