@@ -1,6 +1,6 @@
 const {proxy}=require('./HttpProxy')
 
-const app=proxy();
+const app=proxy({enableMonitor:true});
 
 
 // app.useRouter()

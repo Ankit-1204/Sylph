@@ -12,25 +12,38 @@ class httpProxy {
         this.host= options.host || 'localhost',
         this.target=options.target,
         this.client=new httpClient(options.client || {})
+        this.client.proxy=this;
         this.middlewareManager=new MiddlewareManager()
         this.router=options.router || new TrieRouter()
         this.loadBalancer=new Loadbalancer()
         this.enableMonitor=options.enableMonitor || false
         this.monitorOptions={
-            uiPath:options.monitorOptions?.uiPath || '/dashboard',
-            wsPath:options.monitorOptions?.wsPath || '/ws'
+            uiPath:options.monitorOptions?.uiPath || '/__proxy/dashboard',
+            wsPath:options.monitorOptions?.wsPath || '/__proxy/ws'
         }
+        this.wsClients = new Set();
     }
 
     async start() {
-        if(this.enableMonitor){
-            const ws=new (require('ws').Server)({noServer:true})
-            this.client.on('upgrade',())
-        }
         return new Promise((resolve,reject)=>{
             this.server=http.createServer(async (req,res)=>{
                 await this.handleReq(req,res);
             })
+            if(this.enableMonitor){
+            const ws=new (require('ws').Server)({noServer:true})
+            this.server.on('upgrade',(req,socket,head)=>{
+                if(req.url===this.monitorOptions.wsPath){
+                    ws.handleUpgrade(req,socket,head,(ws)=>{
+                        this.wsClients.add(ws);
+                        ws.on('close',()=>this.wsClients.delete(ws));
+                    });
+                }
+            })
+            this.staticAssets = {
+            html: fs.readFileSync(__dirname + '/ui/monitor.html'),
+            js: fs.readFileSync(__dirname + '/ui/monitor.js').toString().replace('__WS_PATH__', this.monitorOptions.wsPath)
+        };
+        }
             this.server.listen(this.port,this.host,()=>{
                 console.log(`server on ${this.port}`);
                 resolve()
@@ -73,7 +86,18 @@ class httpProxy {
         const starttime=Date.now();
 
         try {
-            
+            if (this.enableMonitor) {
+                const { uiPath } = this.monitorOptions;
+                if (req.url === uiPath) {
+                    res.writeHead(200, { 'Content-Type': 'text/html' });
+                    return res.end(this.staticAssets.html);
+                }
+                if (req.url === uiPath + '.js') {
+                    res.writeHead(200, { 'Content-Type': 'application/javascript' });
+                    return res.end(this.staticAssets.js);
+                }
+            }
+
             const urll=req.url
             const route=this.findRoute(urll,req.method)
             const routeObject=route.handler(route.params);
@@ -209,9 +233,16 @@ class httpClient {
                 console.error('Request stream error:', err);
             }
             })
-            ProxyReq.end();}
+            }
         })
         
+    }
+    broadcastInspector(proxy, payload) {
+        if (!proxy?.enableInspector) return;
+            const msg = JSON.stringify(payload);
+            proxy.wsClients.forEach(ws => {
+                if (ws.readyState === 1) ws.send(msg);
+        });
     }
 }
 function proxy(options={}){
