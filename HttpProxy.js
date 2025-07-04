@@ -70,7 +70,6 @@ class httpProxy {
         }
     }
     findRoute(path,method){
-        console.log('proxy find route')
         return this.router.findRoute(path,method)
     }
     addCache(options={}){
@@ -90,23 +89,28 @@ class httpProxy {
                     res.writeHead(200, { 'Content-Type': 'text/html' });
                     return res.end(this.staticAssets.html);
                 }
-                if (req.url === uiPath + '.js') {
+                if (req.url === "/__proxy/monitor.js") {
                     res.writeHead(200, { 'Content-Type': 'application/javascript' });
                     return res.end(this.staticAssets.js);
                 }
-                if(req.url=== "__proxy/status"){
+                if(req.url=== "/__proxy/status"){
                     res.writeHead(200,{'Content-Type': 'application/json'});
                     return res.end(JSON.stringify({
-                        routes:'pass',
-                        cache:'pass',
-                        loadBalancer:'pass',
+                        routes:this.router.dump(),
+                        cache:this.client.metric,  //Update this to be handled by cache class.
+                        loadBalancer:this.loadBalancer.getStatus(),
                     }))
                 }
             }
 
             const urll=req.url
+            console.log(urll);
             const route=this.findRoute(urll,req.method)
-            const routeObject=route.handler(route.params);
+            const routeObject=route?.handler(route.params);
+            if(!routeObject){
+                throw new Error("Invalid route:" `${route}`);
+                
+            }
             let target;
             let targetObject
             if(routeObject.type==='direct'){
@@ -118,7 +122,6 @@ class httpProxy {
                 throw new Error('Unknown routing type');
             }
             const options = {
-                starttime:starttime,
                 target:new URL(target),
                 hostname: target.host,
                 port: target.port,
@@ -172,6 +175,7 @@ class httpClient {
             const target=data.options.target
             const agent=this.getAgent(target);
             const options={
+                starttime:starttime,
                 target:target,
                 hostname: target.host,
                 port: target.port,
