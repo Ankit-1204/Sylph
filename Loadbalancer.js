@@ -40,6 +40,22 @@ class Loadbalancer{
         if (entry) entry.activeConn = Math.max(0, entry.activeConn - 1);
         return;
     }
+    getStatus(){
+        const statusService={};
+        for(const [name,pool] of Object.entries(this.services)){
+            statusService[name]=pool.map(t=>({
+                url:t.url.href,
+                weight:t.weight,
+                alive:t.alive,
+                activeConn:t.activeConn,
+                totalRequest:t.totalRequest
+            }))
+        }
+        return {
+            statusService, 
+            algorithm:this.algorithm
+        }
+    }
 }
 
 module.exports={Loadbalancer};

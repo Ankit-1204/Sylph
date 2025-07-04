@@ -83,6 +83,29 @@ class TrieRouter{
         }
         return {params:params,handler:currentNode.handler.get(method)};
     }
+    dump(){
+        const list=[];
+        const dfs=(node,prefix)=>{
+            if(!node){
+                return;
+            }
+            if(node.handler){
+                for(const [method,handler] of Object.entries(node.handler)){
+                    list.push({
+                        method,
+                        path:prefix+'/',
+                        handlerName:handler || 'Unknown',
+                        params:node?.params
+                    })
+                }
+            }
+            for(const [segment,child] of Object.entries(node.children)){
+                dfs(child,prefix+'/'+segment)
+            }
+        };
+        dfs(this.root,"");
+        return list;
+    }
 }
 
 module.exports={TrieRouter};

@@ -1,4 +1,3 @@
-const InmemoryStorage=require('./Inmemory')
 const LRUCache=require('lru-cache').LRUCache
 class Cache{
     constructor(options={}){
