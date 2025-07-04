@@ -83,8 +83,6 @@ class httpProxy {
         this.loadBalancer.addService(service,target);
     }
     async handleReq(req,res){
-        const starttime=Date.now();
-
         try {
             if (this.enableMonitor) {
                 const { uiPath } = this.monitorOptions;
@@ -95,6 +93,14 @@ class httpProxy {
                 if (req.url === uiPath + '.js') {
                     res.writeHead(200, { 'Content-Type': 'application/javascript' });
                     return res.end(this.staticAssets.js);
+                }
+                if(req.url=== "__proxy/status"){
+                    res.writeHead(200,{'Content-Type': 'application/json'});
+                    return res.end(JSON.stringify({
+                        routes:'pass',
+                        cache:'pass',
+                        loadBalancer:'pass',
+                    }))
                 }
             }
 
@@ -141,6 +147,12 @@ class httpClient {
         this.timeout=options.timeout || 3000;
         this.cache=null;
         this.agentPool= new Map();
+        this.metric={
+            cacheHits:0,
+            cacheMiss:0,
+            totalRequests:0,
+            totalTime:0,
+        }
     }
     getAgent(target){
         const key=`${target.hostname}:${target.port}`;
@@ -155,6 +167,7 @@ class httpClient {
         return this.agentPool.get(key);
     }
     async makeReq(data){
+        const starttime=Date.now();
         return new Promise((resolve,reject)=>{
             const target=data.options.target
             const agent=this.getAgent(target);
@@ -168,6 +181,7 @@ class httpClient {
                 timeout:this.timeout,
                 agent:agent,
             }
+            this.metric.totalRequests++;
             let part=null;
             if(this.cache){
                 const key=this.cache.keyGenerator(options);   // Note to self, generalise this to integrate with other caching methods (ex. Redis)
@@ -177,10 +191,12 @@ class httpClient {
                 data.res.statusCode=part.statusCode;
                 data.res.headers={...part.headers};
                 data.res.body=part.body
+                this.metric.cacheHits++;
                 resolve(data)
             }
             else{
             console.log('cache_miss');
+            this.metric.cacheMiss++;
             const ProxyReq=http.request(options,(ProxyRes)=>{
                 const isCacheable=this.cache;
                 const key=this.cache?.keyGenerator(options)
@@ -234,6 +250,7 @@ class httpClient {
             }
             })
             }
+        this.metric.totalTime+=Date.now()- starttime;   
         })
         
     }
