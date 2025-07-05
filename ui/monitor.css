@@ -1,0 +1,21 @@
+body{
+    display: flex;
+    flex-direction: column;
+}
+#cacheStats {
+    margin: 5rem;
+    text-align: center;
+    display: grid;
+}
+
+#loadBalancerStats {
+    margin: 5rem;
+    text-align: center;
+    display: grid;
+}
+
+#routes{
+    margin: 5rem;
+    text-align: center;
+    display: grid;
+}
